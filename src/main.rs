@@ -14,6 +14,13 @@ fn main() {
         None
     }));
 
+    tokenizer.add_token_reader(Box::new(|reader, states| {
+        if reader.peek_char() == '$' {
+
+        }
+        None
+    }));
+
     // Otherwise / whitespace.
     tokenizer.add_token_reader(Box::new(|reader, _| {
         reader.forward();
@@ -79,6 +86,11 @@ impl Reader {
 
     fn peek_char_n(&self, n: usize) -> String {
         self.chars.iter().skip(self.position).take(n).map(|ch| *ch).collect()
+    }
+
+    fn peek_until<P>(&self, pred: P) /*-> Option<String>*/
+    where P: FnMut(&char) -> bool {
+        self.chars.iter().skip(self.position).take_while(pred);//.map(|ch| *ch).collect()
     }
 
     fn forward(&mut self) {
