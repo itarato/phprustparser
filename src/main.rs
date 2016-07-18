@@ -2,10 +2,11 @@ fn main() {
     let source = load_source();
     let mut tokenizer = Tokenizer::new(source);
 
-    tokenizer.addTokenReader(Box::new(|reader, states| {
-        if states.phpFileState == PhpFileState::Outside {
+    // PHP start token.
+    tokenizer.add_token_reader(Box::new(|reader, states| {
+        if states.php_file_state == PhpFileState::Outside {
             if reader.peek_char_n(5) == "<?php" {
-                states.phpFileState = PhpFileState::Inside;
+                states.php_file_state = PhpFileState::Inside;
                 reader.forward_n(5);
                 return Some(Token::PhpStart);
             }
@@ -13,7 +14,8 @@ fn main() {
         None
     }));
 
-    tokenizer.addTokenReader(Box::new(|reader, states| {
+    // Otherwise / whitespace.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
         reader.forward();
         Some(Token::Whitespace)
     }));
@@ -53,12 +55,11 @@ impl Default for PhpFileState { fn default() -> Self { PhpFileState::Outside } }
 
 #[derive(Default)]
 struct ReaderStateCollection {
-    phpFileState: PhpFileState,
+    php_file_state: PhpFileState,
 }
 
 #[derive(Default)]
 struct Reader {
-    source: String,
     chars: Vec<char>,
     position: usize,
 }
@@ -67,7 +68,6 @@ impl Reader {
     fn new(source: String) -> Reader {
         let chars = source.chars().collect::<Vec<char>>();
         Reader {
-            source: source,
             chars: chars,
             ..Default::default()
         }
@@ -99,7 +99,7 @@ struct Tokenizer {
     reader: Reader,
     tokens: Vec<Token>,
     states: ReaderStateCollection,
-    tokenReaders: Vec<Box<TokenReader>>,
+    token_readers: Vec<Box<TokenReader>>,
 }
 
 impl Tokenizer {
@@ -108,11 +108,11 @@ impl Tokenizer {
             reader: Reader::new(source),
             tokens: Default::default(),
             states: Default::default(),
-            tokenReaders: Default::default(),
+            token_readers: Default::default(),
         }
     }
 
-    fn addTokenReader(&mut self, tr: Box<TokenReader>) { self.tokenReaders.push(tr); }
+    fn add_token_reader(&mut self, tr: Box<TokenReader>) { self.token_readers.push(tr); }
 
     fn run(&mut self) {
         while !self.reader.is_end() {
@@ -121,7 +121,7 @@ impl Tokenizer {
     }
 
     fn read(&mut self) {
-        for tr in &self.tokenReaders {
+        for tr in &self.token_readers {
             match tr(&mut self.reader, &mut self.states) {
                  Some(token) => {
                     println!("Token: {:#?}", token);
