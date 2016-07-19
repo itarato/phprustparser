@@ -1,3 +1,60 @@
+macro_rules! in_char_ranges_callback {
+    ( $([$f:expr, $t: expr]),* ) => {
+        |ch| {
+            $( (**ch >= $f && **ch <= $t) ||)* false
+        }
+    }
+}
+
+macro_rules! in_chars_callback {
+    ( $($c:expr),* ) => {
+        |ch| {
+            $( (**ch == $c) ||)* false
+        }
+    }
+}
+
+macro_rules! not_in_chars_callback {
+    ( $($c:expr),* ) => {
+        |ch| {
+            $( (**ch != $c) &&)* true
+        }
+    }
+}
+
+macro_rules! is_valid_fn {
+    (VARNAME) => (
+        in_char_ranges_callback!{['a', 'z'], ['A', 'Z'], ['0', '9'], ['_', '_'], ['$', '$']}
+    );
+    (NUMBER) => (
+        in_char_ranges_callback!{['0', '9'], ['-', '-'], ['.', '.']}
+    );
+    (OP) => (
+        in_chars_callback!{'+', '-', '*', '/', '%', '^', '=', '!', '.'}
+    );
+    (NOT, $ch:expr) => (
+        not_in_chars_callback!($ch)
+    );
+}
+
+macro_rules! is_valid {
+    (VARNAME_START, $c:expr) => ({
+        ($c >= 'a' && $c <= 'z') || ($c >= 'A' && $c <= 'Z')
+    });
+}
+
+macro_rules! add_one_char_token_reader {
+    ($tokenizer:expr, $ch:expr, $out:expr) => {{
+        $tokenizer.add_token_reader(Box::new(|reader, _| {
+            if reader.peek_char() == $ch {
+                reader.forward();
+                return Some($out);
+            }
+            None
+        }));
+    }}
+}
+
 fn main() {
     let source = load_source();
     let mut tokenizer = Tokenizer::new(source);
@@ -15,15 +72,65 @@ fn main() {
         None
     }));
 
+    tokenizer.add_token_reader(Box::new(|reader, _| {
+        for keyword_name in Keyword::all_names() {
+            if reader.peek_char_n(keyword_name.len()) == keyword_name {
+                reader.forward_n(keyword_name.len());
+                return Some(Token::Keyword(Keyword::for_name(keyword_name)));
+            }
+        }
+        None
+    }));
+
+    // String.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
+        let c = reader.peek_char();
+        if c == '"' || c == '\'' {
+            reader.forward();
+            let s = reader.peek_until(is_valid_fn!(NOT, c));
+            reader.forward_n(s.len() + 1);
+            return Some(Token::StringValue(s));
+        }
+        None
+    }));
+
     // Variable name.
     tokenizer.add_token_reader(Box::new(|reader, _| {
         if reader.peek_char() == '$' {
             reader.forward();
-            let s = reader.peek_until(|ch| {
-                **ch >= 'a' && **ch <= 'z'
-            });
+            let s = reader.peek_until(is_valid_fn!(VARNAME));
             reader.forward_n(s.len());
             return Some(Token::VariableName(s))
+        }
+        None
+    }));
+
+    // Operation.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
+        let ops = reader.peek_until(is_valid_fn!(OP));
+        if ops.len() > 0 {
+            reader.forward_n(ops.len());
+            return Some(Token::Op(ops));
+        }
+        None
+    }));
+
+    // Semicolon.
+    add_one_char_token_reader!(tokenizer, ';', Token::Semicolon);
+
+    // Brackets.
+    add_one_char_token_reader!(tokenizer, '(', Token::ParenthesisOpen);
+    add_one_char_token_reader!(tokenizer, ')', Token::ParenthesisClose);
+    add_one_char_token_reader!(tokenizer, '{', Token::BlockOpen);
+    add_one_char_token_reader!(tokenizer, '}', Token::BlockClose);
+
+    // Function call.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
+        let ch = reader.peek_char();
+        if is_valid!(VARNAME_START, ch) {
+            let name = reader.peek_until(is_valid_fn!(VARNAME));
+            reader.forward_n(name.len());
+            return Some(Token::FunctionName(name));
         }
         None
     }));
@@ -39,23 +146,51 @@ fn main() {
 
 fn load_source() -> String {
     return "<?php
+
+function say($text) {
+    echo('Hello ' . $text);
+}
+
 $foo = 'Hello world';
-echo($foo);
+say($foo);
 ".to_string();
 }
 
 type TokenReader = Fn(&mut Reader, &mut ReaderStateCollection) -> Option<Token>;
 
 #[derive(Debug)]
+enum Keyword {
+    Function,
+}
+
+impl Keyword {
+    fn for_name(name: &str) -> Keyword {
+        match name {
+            "function" => Keyword::Function,
+            _ => panic!("Illegal keyword"),
+        }
+    }
+
+    fn all_names() -> Vec<&'static str> {
+        vec![
+            "function",
+        ]
+    }
+}
+
+#[derive(Debug)]
 enum Token {
     PhpStart,
+    Keyword(Keyword),
     VariableName(String),
-    OpEqual,
+    Op(String),
     StringValue(String),
     Semicolon,
     FunctionName(String),
     ParenthesisOpen,
     ParenthesisClose,
+    BlockOpen,
+    BlockClose,
     Whitespace,
 }
 
@@ -110,7 +245,6 @@ impl Reader {
     fn is_end(&self) -> bool {
         self.position >= self.chars.len()
     }
-
 }
 
 struct Tokenizer {
@@ -136,17 +270,19 @@ impl Tokenizer {
         while !self.reader.is_end() {
             self.read();
         }
+        println!("{:?}", self.tokens);
     }
 
     fn read(&mut self) {
         for tr in &self.token_readers {
             match tr(&mut self.reader, &mut self.states) {
-                 Some(token) => {
+                Some(Token::Whitespace) => println!("."),
+                Some(token) => {
                     println!("Token: {:?}", token);
                     self.tokens.push(token);
                     break;
-                 },
-                 None => { },
+                },
+                None => { },
              }
         }
     }
