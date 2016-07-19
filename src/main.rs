@@ -10,13 +10,20 @@ fn main() {
                 reader.forward_n(5);
                 return Some(Token::PhpStart);
             }
+            return Some(Token::Whitespace)
         }
         None
     }));
 
-    tokenizer.add_token_reader(Box::new(|reader, states| {
+    // Variable name.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
         if reader.peek_char() == '$' {
-
+            reader.forward();
+            let s = reader.peek_until(|ch| {
+                **ch >= 'a' && **ch <= 'z'
+            });
+            reader.forward_n(s.len());
+            return Some(Token::VariableName(s))
         }
         None
     }));
@@ -88,9 +95,8 @@ impl Reader {
         self.chars.iter().skip(self.position).take(n).map(|ch| *ch).collect()
     }
 
-    fn peek_until<P>(&self, pred: P) /*-> Option<String>*/
-    where P: FnMut(&char) -> bool {
-        self.chars.iter().skip(self.position).take_while(pred);//.map(|ch| *ch).collect()
+    fn peek_until<P>(&self, pred: P) -> String where for <'r> P: FnMut(&'r &char) -> bool {
+        self.chars.iter().skip(self.position).take_while(pred).map(|ch| *ch).collect()
     }
 
     fn forward(&mut self) {
@@ -136,7 +142,7 @@ impl Tokenizer {
         for tr in &self.token_readers {
             match tr(&mut self.reader, &mut self.states) {
                  Some(token) => {
-                    println!("Token: {:#?}", token);
+                    println!("Token: {:?}", token);
                     self.tokens.push(token);
                     break;
                  },
