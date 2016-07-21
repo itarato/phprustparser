@@ -1,62 +1,15 @@
-macro_rules! in_char_ranges_callback {
-    ( $([$f:expr, $t: expr]),* ) => {
-        |ch| {
-            $( (**ch >= $f && **ch <= $t) ||)* false
-        }
-    }
-}
+#[macro_use]
+mod macros;
+mod reader;
+mod tokenizer;
+mod ast;
 
-macro_rules! in_chars_callback {
-    ( $($c:expr),* ) => {
-        |ch| {
-            $( (**ch == $c) ||)* false
-        }
-    }
-}
-
-macro_rules! not_in_chars_callback {
-    ( $($c:expr),* ) => {
-        |ch| {
-            $( (**ch != $c) &&)* true
-        }
-    }
-}
-
-macro_rules! is_valid_fn {
-    (VARNAME) => (
-        in_char_ranges_callback!{['a', 'z'], ['A', 'Z'], ['0', '9'], ['_', '_'], ['$', '$']}
-    );
-    (NUMBER) => (
-        in_char_ranges_callback!{['0', '9'], ['-', '-'], ['.', '.']}
-    );
-    (OP) => (
-        in_chars_callback!{'+', '-', '*', '/', '%', '^', '=', '!', '.'}
-    );
-    (NOT, $ch:expr) => (
-        not_in_chars_callback!($ch)
-    );
-}
-
-macro_rules! is_valid {
-    (VARNAME_START, $c:expr) => ({
-        ($c >= 'a' && $c <= 'z') || ($c >= 'A' && $c <= 'Z')
-    });
-}
-
-macro_rules! add_one_char_token_reader {
-    ($tokenizer:expr, $ch:expr, $out:expr) => {{
-        $tokenizer.add_token_reader(Box::new(|reader, _| {
-            if reader.peek_char() == $ch {
-                reader.forward();
-                return Some($out);
-            }
-            None
-        }));
-    }}
-}
+use tokenizer::{Tokenizer, Token, PhpFileState, Keyword};
+use ast::{AstBuilder};
 
 fn main() {
     let source = load_source();
+    println!("{}", source);
     let mut tokenizer = Tokenizer::new(source);
 
     // PHP start token.
@@ -142,6 +95,11 @@ fn main() {
     }));
 
     tokenizer.run();
+    let tokens = &tokenizer.tokens;
+    println!("Tokens: {:?}", &tokens);
+
+    let mut ast_builder = AstBuilder::new();
+    ast_builder.build(tokens);
 }
 
 fn load_source() -> String {
@@ -154,136 +112,4 @@ function say($text) {
 $foo = 'Hello world';
 say($foo);
 ".to_string();
-}
-
-type TokenReader = Fn(&mut Reader, &mut ReaderStateCollection) -> Option<Token>;
-
-#[derive(Debug)]
-enum Keyword {
-    Function,
-}
-
-impl Keyword {
-    fn for_name(name: &str) -> Keyword {
-        match name {
-            "function" => Keyword::Function,
-            _ => panic!("Illegal keyword"),
-        }
-    }
-
-    fn all_names() -> Vec<&'static str> {
-        vec![
-            "function",
-        ]
-    }
-}
-
-#[derive(Debug)]
-enum Token {
-    PhpStart,
-    Keyword(Keyword),
-    VariableName(String),
-    Op(String),
-    StringValue(String),
-    Semicolon,
-    FunctionName(String),
-    ParenthesisOpen,
-    ParenthesisClose,
-    BlockOpen,
-    BlockClose,
-    Whitespace,
-}
-
-#[derive(PartialEq)]
-enum PhpFileState {
-    Outside,
-    Inside,
-}
-
-impl Default for PhpFileState { fn default() -> Self { PhpFileState::Outside } }
-
-#[derive(Default)]
-struct ReaderStateCollection {
-    php_file_state: PhpFileState,
-}
-
-#[derive(Default)]
-struct Reader {
-    chars: Vec<char>,
-    position: usize,
-}
-
-impl Reader {
-    fn new(source: String) -> Reader {
-        let chars = source.chars().collect::<Vec<char>>();
-        Reader {
-            chars: chars,
-            ..Default::default()
-        }
-    }
-
-    fn peek_char(&self) -> char {
-        self.chars[self.position]
-    }
-
-    fn peek_char_n(&self, n: usize) -> String {
-        self.chars.iter().skip(self.position).take(n).map(|ch| *ch).collect()
-    }
-
-    fn peek_until<P>(&self, pred: P) -> String where for <'r> P: FnMut(&'r &char) -> bool {
-        self.chars.iter().skip(self.position).take_while(pred).map(|ch| *ch).collect()
-    }
-
-    fn forward(&mut self) {
-        self.position += 1
-    }
-
-    fn forward_n(&mut self, n: usize) {
-        self.position += n
-    }
-
-    fn is_end(&self) -> bool {
-        self.position >= self.chars.len()
-    }
-}
-
-struct Tokenizer {
-    reader: Reader,
-    tokens: Vec<Token>,
-    states: ReaderStateCollection,
-    token_readers: Vec<Box<TokenReader>>,
-}
-
-impl Tokenizer {
-    fn new(source: String) -> Tokenizer {
-        Tokenizer {
-            reader: Reader::new(source),
-            tokens: Default::default(),
-            states: Default::default(),
-            token_readers: Default::default(),
-        }
-    }
-
-    fn add_token_reader(&mut self, tr: Box<TokenReader>) { self.token_readers.push(tr); }
-
-    fn run(&mut self) {
-        while !self.reader.is_end() {
-            self.read();
-        }
-        println!("{:?}", self.tokens);
-    }
-
-    fn read(&mut self) {
-        for tr in &self.token_readers {
-            match tr(&mut self.reader, &mut self.states) {
-                Some(Token::Whitespace) => println!("."),
-                Some(token) => {
-                    println!("Token: {:?}", token);
-                    self.tokens.push(token);
-                    break;
-                },
-                None => { },
-             }
-        }
-    }
 }
