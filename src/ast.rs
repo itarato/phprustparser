@@ -2,10 +2,9 @@ use tokenizer::{Token, Keyword};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::iter::Iterator;
-use std::fmt;
 
 #[derive(Debug)]
-struct Node {
+pub struct Node {
     name: String,
     children: Vec<Node>,
 }
@@ -44,12 +43,9 @@ impl<'a> AstBuilder<'a> {
         let mut n = Node::new("code block".to_string());
 
         while true {
-            {
-                let currentToken = self.tlr.current();
-                match currentToken {
-                    &Token::Eof | &Token::BlockClose => break,
-                    _ => { },
-                }
+            match self.tlr.current() {
+                &Token::Eof | &Token::BlockClose => break,
+                _ => { },
             }
 
             let child = self.build_stmt();
@@ -75,13 +71,10 @@ impl<'a> AstBuilder<'a> {
         let n = Node::new("exp".to_string());
 
         while true {
-            {
-                let currentToken = self.tlr.current();
-                match currentToken {
-                    &Token::Semicolon => break,
-                    _ => {
-                    },
-                }
+            match self.tlr.current() {
+                &Token::Semicolon => break,
+                _ => {
+                },
             }
 
             self.tlr.next();
@@ -111,7 +104,7 @@ impl<'a> AstBuilder<'a> {
         // Fn block open.
         self.tlr.next();
 
-        let child = self.build_code_block(); // ---> NOW ADD EXP TO STMT AS SECOND OPTION
+        let child = self.build_code_block();
         n.add(child);
 
         // Fn block close.
@@ -127,12 +120,10 @@ impl<'a> AstBuilder<'a> {
         self.tlr.next();
 
         while true {
-            {
-                match self.tlr.current() {
-                    &Token::VariableName(ref v) => n.add(Node::new(format!("T> variable name: {}", v))),
-                    _ => break,
-                };
-            }
+            match self.tlr.current() {
+                &Token::VariableName(ref v) => n.add(Node::new(format!("T> variable name: {}", v))),
+                _ => break,
+            };
             self.tlr.next();
         }
 

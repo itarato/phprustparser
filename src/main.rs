@@ -1,3 +1,5 @@
+#![allow(while_true)]
+
 #[macro_use]
 mod macros;
 mod reader;
@@ -107,6 +109,12 @@ fn load_source() -> String {
 
 function say($text) {
     echo('Hello ' . $text);
+}
+
+function boo() {
+    print('Something');
+    $foo = 'never';
+    print($foo, $foo);
 }
 
 $foo = 'Hello world';
