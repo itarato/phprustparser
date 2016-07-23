@@ -1,54 +1,77 @@
-use tokenizer::{Token};
+use tokenizer::{Token, Keyword};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::iter::Iterator;
+use std::fmt;
 
-struct Node<T: AstRule> {
-    token: Option<Token>,
+struct Node {
     name: &'static str,
-    children: Vec<Node<T>>,
-    rule: Box<T>,
+    children: Vec<Node>,
 }
 
-impl<T: AstRule> Node<T> {
-    fn new(name: &'static str, rule: Box<T>) -> Node<T> {
+impl Node {
+    fn new(name: &'static str) -> Node {
         Node {
             name: name,
-            rule: rule,
-            token: Default::default(),
             children: Default::default(),
         }
     }
 
-    fn add(&mut self, node: Node<T>) {
+    fn add(&mut self, node: Node) {
         self.children.push(node);
     }
 }
 
-pub struct AstBuilder;
-
-impl AstBuilder {
-    pub fn new() -> AstBuilder {
-        AstBuilder
-    }
-
-    pub fn build(&mut self, tokens: &Vec<Token>) {
-        let tlr = Rc::new(RefCell::new(TokenListReader::new(Rc::new(RefCell::new(tokens)))));
-        let root = Node::new("code", Box::new(CodeRule));
-        root.rule.run(tlr.clone());
-    }
+pub struct AstBuilder<'a> {
+    tlr: TokenListReader<'a>,
 }
 
-trait AstRule {
-    fn run(&self, tlr: Rc<RefCell<TokenListReader>>);
-}
+impl<'a> AstBuilder<'a> {
+    pub fn new(tokens: &Vec<Token>) -> AstBuilder {
+        AstBuilder {
+            tlr: TokenListReader::new(Rc::new(RefCell::new(tokens))),
+        }
+    }
 
-struct CodeRule;
+    pub fn build(&mut self) {
+        let root = self.build_code_block();
+    }
 
-impl AstRule for CodeRule {
-    fn run(&self, tlr: Rc<RefCell<TokenListReader>>) {
-        // Here I expect: FN_DEF | STMT
-        println!("{:?}", tlr.borrow().current());
+    pub fn build_code_block(&mut self) -> Node {
+        self.tlr.next();
+        let mut n = Node::new("root");
+
+        let child = self.build_stmt();
+        n.add(child);
+
+        n
+    }
+
+    pub fn build_stmt(&mut self) -> Node {
+        let mut n = Node::new("stmt");
+
+        let token = self.tlr.current();
+        println!("{:?}", token);
+
+        n
+    }
+
+    pub fn build_stmt_fn(&mut self) -> Node {
+        let mut n = Node::new("fn");
+
+        self.tlr.next();
+        n.add(Node::new("T> keyword function"));
+
+        match *self.tlr.current() {
+            Token::FunctionName(ref s) => {
+                let name = format!("T> function name: {}", s.as_str());
+                // let name = "few";
+                n.add(Node::new(&name.clone()));
+            },
+            ref t @ _ => panic!("Unexpected token {:?}", t),
+        }
+
+        n
     }
 }
 

@@ -98,8 +98,8 @@ fn main() {
     let tokens = &tokenizer.tokens;
     println!("Tokens: {:?}", &tokens);
 
-    let mut ast_builder = AstBuilder::new();
-    ast_builder.build(tokens);
+    let mut ast_builder = AstBuilder::new(tokens);
+    ast_builder.build();
 }
 
 fn load_source() -> String {
