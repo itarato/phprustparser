@@ -49,6 +49,7 @@ pub enum Token {
     BlockOpen,
     BlockClose,
     Whitespace,
+    Eof,
 }
 
 pub struct Tokenizer {
@@ -74,6 +75,7 @@ impl Tokenizer {
         while !self.reader.is_end() {
             self.read();
         }
+        self.tokens.push(Token::Eof);
     }
 
     fn read(&mut self) {
