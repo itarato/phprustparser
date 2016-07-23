@@ -27,6 +27,7 @@ fn main() {
         None
     }));
 
+    // Keyword.
     tokenizer.add_token_reader(Box::new(|reader, _| {
         for keyword_name in Keyword::all_names() {
             if reader.peek_char_n(keyword_name.len()) == keyword_name {
@@ -45,6 +46,24 @@ fn main() {
             let s = reader.peek_until(is_valid_fn!(NOT, c));
             reader.forward_n(s.len() + 1);
             return Some(Token::StringValue(s));
+        }
+        None
+    }));
+
+
+    // Number.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
+        let ch = reader.peek_char();
+        if is_valid!(NUMBER_START, ch) {
+            if !is_valid!(DIGIT, ch) {
+                let ch_second = reader.peek_char_from(1);
+                if !is_valid!(DIGIT, ch_second) {
+                    return None
+                }
+            }
+            let s = reader.peek_until(is_valid_fn!(NUMBER));
+            reader.forward_n(s.len());
+            return Some(Token::NumericValue(s));
         }
         None
     }));
@@ -109,6 +128,7 @@ fn load_source() -> String {
 
 function say($text) {
     echo('Hello ' . $text);
+    $foo = 1 + 2 - 3;
 }
 
 function boo() {

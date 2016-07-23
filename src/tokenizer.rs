@@ -42,6 +42,7 @@ pub enum Token {
     VariableName(String),
     Op(String),
     StringValue(String),
+    NumericValue(String),
     Semicolon,
     FunctionName(String),
     ParenthesisOpen,

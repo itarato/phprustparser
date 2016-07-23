@@ -14,7 +14,11 @@ impl Reader {
     }
 
     pub fn peek_char(&self) -> char {
-        self.chars[self.position]
+        self.peek_char_from(0)
+    }
+
+    pub fn peek_char_from(&self, offset: usize) -> char {
+        self.chars[self.position + offset]
     }
 
     pub fn peek_char_n(&self, n: usize) -> String {

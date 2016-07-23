@@ -42,6 +42,12 @@ macro_rules! is_valid {
     (VARNAME_START, $c:expr) => ({
         ($c >= 'a' && $c <= 'z') || ($c >= 'A' && $c <= 'Z')
     });
+    (NUMBER_START, $c:expr) => ({
+        ($c >= '0' && $c <= '9') || $c == '-'
+    });
+    (DIGIT, $c:expr) => ({
+        ($c >= '0' && $c <= '9')
+    });
 }
 
 macro_rules! add_one_char_token_reader {
