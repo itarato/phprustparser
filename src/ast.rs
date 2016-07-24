@@ -43,7 +43,7 @@ impl<'a> AstBuilder<'a> {
         let mut n = Node::new("code block".to_string());
 
         while true {
-            match self.tlr.current() {
+            match self.tlr.peek() {
                 &Token::Eof | &Token::BlockClose => break,
                 _ => { },
             }
@@ -58,7 +58,7 @@ impl<'a> AstBuilder<'a> {
     pub fn build_stmt(&mut self) -> Node {
         let mut n = Node::new("stmt".to_string());
 
-        let child = match *self.tlr.current() {
+        let child = match *self.tlr.peek() {
             Token::Keyword(Keyword::Function) => self.build_stmt_fn(),
             _ => self.build_stmt_exp(),
         };
@@ -71,14 +71,23 @@ impl<'a> AstBuilder<'a> {
         let n = Node::new("exp".to_string());
 
         while true {
-            match self.tlr.current() {
+            match self.tlr.peek() {
                 &Token::Semicolon => break,
-                _ => {
+                &Token::FunctionName(ref s) => {
                 },
+                _ => {}
             }
 
             self.tlr.next();
         }
+        self.tlr.next();
+
+        n
+    }
+
+    pub fn build_fn_call(&mut self) -> Node {
+        let n = Node::new("fn call".to_string());
+
         self.tlr.next();
 
         n
@@ -90,7 +99,7 @@ impl<'a> AstBuilder<'a> {
         self.tlr.next();
         n.add(Node::new("T> keyword function".to_string()));
 
-        match *self.tlr.current() {
+        match *self.tlr.peek() {
             Token::FunctionName(ref s) => {
                 n.add(Node::new(format!("T> function name: {}", s)));
             },
@@ -120,7 +129,7 @@ impl<'a> AstBuilder<'a> {
         self.tlr.next();
 
         while true {
-            match self.tlr.current() {
+            match self.tlr.peek() {
                 &Token::VariableName(ref v) => n.add(Node::new(format!("T> variable name: {}", v))),
                 _ => break,
             };
@@ -147,8 +156,12 @@ impl<'a> TokenListReader<'a> {
         }
     }
 
-    fn current(&self) -> &Token {
-        &self.tokens.borrow()[self.pos]
+    fn peek(&self) -> &Token {
+        self.peek_from(0)
+    }
+
+    fn peek_from(&self, offset: usize) -> &Token {
+        &self.tokens.borrow()[self.pos + offset]
     }
 
     fn next(&mut self) {

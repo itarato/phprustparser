@@ -50,7 +50,6 @@ fn main() {
         None
     }));
 
-
     // Number.
     tokenizer.add_token_reader(Box::new(|reader, _| {
         let ch = reader.peek_char();
