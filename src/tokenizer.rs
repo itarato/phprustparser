@@ -40,6 +40,7 @@ pub enum Token {
     PhpStart,
     Keyword(Keyword),
     Op(String),
+    Assignment,
     StringValue(String),
     VariableName(String),
     NumericValue(String),
@@ -84,7 +85,6 @@ impl Tokenizer {
             match tr(&mut self.reader, &mut self.states) {
                 Some(Token::Whitespace) => { },
                 Some(token) => {
-                    // println!("Token: {:?}", token);
                     self.tokens.push(token);
                     break;
                 },

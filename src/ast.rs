@@ -42,8 +42,7 @@ impl<'a> AstBuilder<'a> {
     }
 
     pub fn build(&mut self) -> Node {
-        // PHP start.
-        self.tlr.next();
+        self.tlr.next(); // PHP start.
         self.build_code_block()
     }
 
@@ -68,7 +67,12 @@ impl<'a> AstBuilder<'a> {
 
         let child = match self.tlr.peek() {
             Token::Keyword(Keyword::Function) => self.build_stmt_fn(),
-            _ => self.build_stmt_exp(),
+            _ => {
+                let exp_child = self.build_stmt_exp();
+                self.tlr.next(); // Semicolon;
+                exp_child
+            },
+            // @todo here comes the control structures
         };
         n.add(child);
 
@@ -78,31 +82,41 @@ impl<'a> AstBuilder<'a> {
     pub fn build_stmt_exp(&mut self) -> Node {
         let mut n = Node::new("exp".to_string());
 
+        let mut children: Vec<Node> = Vec::new();
+
         while true {
             let current_token = self.tlr.peek();
-            let mut children: Vec<Node> = Vec::new();
             match current_token {
                 Token::Semicolon => break,
-                Token::FunctionName(s) => { self.build_fn_call(); },
-                Token::VariableName(s) => { self.tlr.next(); },
-                _ => { self.tlr.next(); },
+                Token::Assignment => {
+                    self.tlr.next(); // OP =.
+                    let mut assignment = Node::new("assignment".to_string());
+                    assignment.add(children.pop().unwrap());
+                    assignment.add(self.build_stmt_exp());
+                    n.add(assignment);
+                },
+                Token::FunctionName(_) => {
+                    children.push(self.build_fn_call());
+                },
+                Token::VariableName(_) | Token::StringValue(_) | Token::NumericValue(_) | Token::Op(_) => {
+                    children.push(self.build_single_token());
+                },
+                t @ _ => panic!("Unknown token {:?}", t),
             };
         }
-
-        // Semicolon;
-        self.tlr.next();
 
         n
     }
 
-    pub fn build_stmt_exp_var(&mut self) -> Node {
+    pub fn build_single_token(&mut self) -> Node {
         Node::leaf(self.tlr.next())
     }
 
     pub fn build_fn_call(&mut self) -> Node {
-        let n = Node::new("fn call".to_string());
+        let mut n = Node::new("fn call".to_string());
 
-        self.tlr.next();
+        n.add(Node::leaf(self.tlr.next()));
+        n.add(self.build_arg_list());
 
         n
     }
@@ -143,7 +157,7 @@ impl<'a> AstBuilder<'a> {
         // @todo introduce comma as token and use it as selector
         while true {
             match self.tlr.peek() {
-                t @ Token::VariableName(_) => n.add(Node::leaf(t)),
+                t @ Token::VariableName(_) | t @ Token::StringValue(_) | t @ Token::NumericValue(_) => n.add(Node::leaf(t)),
                 Token::ParenthesisClose => break,
                 t @ _ => panic!("Unexpected token for arg list {:?}", t),
             };

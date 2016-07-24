@@ -78,6 +78,15 @@ fn main() {
         None
     }));
 
+    // Assignment.
+    tokenizer.add_token_reader(Box::new(|reader, _| {
+        if reader.peek_char() == '=' && reader.peek_char_from(1) != '=' {
+            reader.forward();
+            return Some(Token::Assignment);
+        }
+        None
+    }));
+
     // Operation.
     tokenizer.add_token_reader(Box::new(|reader, _| {
         let ops = reader.peek_until(is_valid_fn!(OP));
@@ -127,7 +136,7 @@ fn load_source() -> String {
     return "<?php
 
 function say($text) {
-    echo('Hello ' . $text);
+    echo('Hello World');
     $foo = 1 + 2 - 3;
 }
 
