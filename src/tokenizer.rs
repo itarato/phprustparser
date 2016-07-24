@@ -2,7 +2,7 @@ use reader::Reader;
 
 pub type TokenReader = Fn(&mut Reader, &mut ReaderStateCollection) -> Option<Token>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Keyword {
     Function,
 }
@@ -35,13 +35,13 @@ pub struct ReaderStateCollection {
     pub php_file_state: PhpFileState,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Token {
     PhpStart,
     Keyword(Keyword),
-    VariableName(String),
     Op(String),
     StringValue(String),
+    VariableName(String),
     NumericValue(String),
     Semicolon,
     FunctionName(String),

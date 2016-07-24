@@ -119,7 +119,8 @@ fn main() {
     println!("Tokens: {:?}", &tokens);
 
     let mut ast_builder = AstBuilder::new(tokens);
-    ast_builder.build();
+    let ast = ast_builder.build();
+    println!("AST: {:#?}", &ast);
 }
 
 fn load_source() -> String {

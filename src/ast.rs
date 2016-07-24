@@ -3,9 +3,10 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::iter::Iterator;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Node {
     name: String,
+    token: Option<Token>,
     children: Vec<Node>,
 }
 
@@ -13,7 +14,14 @@ impl Node {
     fn new(name: String) -> Node {
         Node {
             name: name,
-            children: Default::default(),
+            ..Default::default()
+        }
+    }
+
+    fn leaf(token: Token) -> Node {
+        Node {
+            token: Some(token),
+            ..Default::default()
         }
     }
 
@@ -33,18 +41,18 @@ impl<'a> AstBuilder<'a> {
         }
     }
 
-    pub fn build(&mut self) {
-        let root = self.build_code_block();
-        println!("{:#?}", root);
+    pub fn build(&mut self) -> Node {
+        // PHP start.
+        self.tlr.next();
+        self.build_code_block()
     }
 
     pub fn build_code_block(&mut self) -> Node {
-        self.tlr.next();
         let mut n = Node::new("code block".to_string());
 
         while true {
             match self.tlr.peek() {
-                &Token::Eof | &Token::BlockClose => break,
+                Token::Eof | Token::BlockClose => break,
                 _ => { },
             }
 
@@ -58,7 +66,7 @@ impl<'a> AstBuilder<'a> {
     pub fn build_stmt(&mut self) -> Node {
         let mut n = Node::new("stmt".to_string());
 
-        let child = match *self.tlr.peek() {
+        let child = match self.tlr.peek() {
             Token::Keyword(Keyword::Function) => self.build_stmt_fn(),
             _ => self.build_stmt_exp(),
         };
@@ -68,21 +76,27 @@ impl<'a> AstBuilder<'a> {
     }
 
     pub fn build_stmt_exp(&mut self) -> Node {
-        let n = Node::new("exp".to_string());
+        let mut n = Node::new("exp".to_string());
 
         while true {
-            match self.tlr.peek() {
-                &Token::Semicolon => break,
-                &Token::FunctionName(ref s) => {
-                },
-                _ => {}
-            }
-
-            self.tlr.next();
+            let current_token = self.tlr.peek();
+            let mut children: Vec<Node> = Vec::new();
+            match current_token {
+                Token::Semicolon => break,
+                Token::FunctionName(s) => { self.build_fn_call(); },
+                Token::VariableName(s) => { self.tlr.next(); },
+                _ => { self.tlr.next(); },
+            };
         }
+
+        // Semicolon;
         self.tlr.next();
 
         n
+    }
+
+    pub fn build_stmt_exp_var(&mut self) -> Node {
+        Node::leaf(self.tlr.next())
     }
 
     pub fn build_fn_call(&mut self) -> Node {
@@ -96,14 +110,12 @@ impl<'a> AstBuilder<'a> {
     pub fn build_stmt_fn(&mut self) -> Node {
         let mut n = Node::new("fn".to_string());
 
+        n.add(Node::leaf(self.tlr.peek()));
         self.tlr.next();
-        n.add(Node::new("T> keyword function".to_string()));
 
-        match *self.tlr.peek() {
-            Token::FunctionName(ref s) => {
-                n.add(Node::new(format!("T> function name: {}", s)));
-            },
-            ref t @ _ => panic!("Unexpected token {:?}", t),
+        match self.tlr.peek() {
+            t @ Token::FunctionName(_) => { n.add(Node::leaf(t)); },
+            t @ _ => panic!("Unexpected token {:?}", t),
         }
         self.tlr.next();
 
@@ -128,10 +140,12 @@ impl<'a> AstBuilder<'a> {
         // Open parenthesis.
         self.tlr.next();
 
+        // @todo introduce comma as token and use it as selector
         while true {
             match self.tlr.peek() {
-                &Token::VariableName(ref v) => n.add(Node::new(format!("T> variable name: {}", v))),
-                _ => break,
+                t @ Token::VariableName(_) => n.add(Node::leaf(t)),
+                Token::ParenthesisClose => break,
+                t @ _ => panic!("Unexpected token for arg list {:?}", t),
             };
             self.tlr.next();
         }
@@ -156,15 +170,17 @@ impl<'a> TokenListReader<'a> {
         }
     }
 
-    fn peek(&self) -> &Token {
-        self.peek_from(0)
+    fn peek(&self) -> Token {
+        self.peek_from(0).clone()
     }
 
-    fn peek_from(&self, offset: usize) -> &Token {
-        &self.tokens.borrow()[self.pos + offset]
+    fn peek_from(&self, offset: usize) -> Token {
+        self.tokens.borrow()[self.pos + offset].clone()
     }
 
-    fn next(&mut self) {
+    fn next(&mut self) -> Token {
+        let current = self.peek();
         self.pos += 1;
+        current
     }
 }
