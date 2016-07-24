@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::iter::Iterator;
 
-#[derive(Debug, Default)]
+#[derive(Default, Debug)]
 pub struct Node {
     name: String,
     token: Option<Token>,
@@ -103,6 +103,21 @@ impl<'a> AstBuilder<'a> {
                 },
                 t @ _ => panic!("Unknown token {:?}", t),
             };
+
+            if children.len() == 3 {
+                let mut op_child = Node::new("op".to_string());
+                let right = children.pop().unwrap();
+                let op = children.pop().unwrap();
+                let left = children.pop().unwrap();
+                op_child.add(left);
+                op_child.add(op);
+                op_child.add(right);
+                children.push(op_child);
+            }
+        }
+
+        while children.len() > 0 {
+            n.add(children.pop().unwrap());
         }
 
         n
