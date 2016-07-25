@@ -51,6 +51,7 @@ pub enum Token {
     BlockOpen,
     BlockClose,
     Whitespace,
+    Comma,
     Eof,
 }
 

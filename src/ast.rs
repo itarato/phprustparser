@@ -87,7 +87,7 @@ impl<'a> AstBuilder<'a> {
         while true {
             let current_token = self.tlr.peek();
             match current_token {
-                Token::Semicolon => break,
+                Token::Semicolon | Token::Comma | Token::ParenthesisClose => break,
                 Token::Assignment => {
                     self.tlr.next(); // OP =.
                     let mut assignment = Node::new("assignment".to_string());
@@ -101,6 +101,11 @@ impl<'a> AstBuilder<'a> {
                 Token::VariableName(_) | Token::StringValue(_) | Token::NumericValue(_) | Token::Op(_) => {
                     children.push(self.build_single_token());
                 },
+                Token::ParenthesisOpen => {
+                    self.tlr.next(); // Parenthesis open.
+                    children.push(self.build_stmt_exp());
+                    self.tlr.next(); // Parenthesis close.
+                }
                 t @ _ => panic!("Unknown token {:?}", t),
             };
 
@@ -123,6 +128,27 @@ impl<'a> AstBuilder<'a> {
         n
     }
 
+    pub fn build_arg_exp_list(&mut self) -> Node {
+        let mut n = Node::new("fn call exp list".to_string());
+
+        // Open parenthesis.
+        self.tlr.next();
+
+        // @todo introduce comma as token and use it as selector
+        while true {
+            match self.tlr.peek() {
+                Token::Comma => { self.tlr.next(); },
+                Token::ParenthesisClose => break,
+                _ => n.add(self.build_stmt_exp()),
+            };
+        }
+
+        // Close parenthesis.
+        self.tlr.next();
+
+        n
+    }
+
     pub fn build_single_token(&mut self) -> Node {
         Node::leaf(self.tlr.next())
     }
@@ -131,7 +157,7 @@ impl<'a> AstBuilder<'a> {
         let mut n = Node::new("fn call".to_string());
 
         n.add(Node::leaf(self.tlr.next()));
-        n.add(self.build_arg_list());
+        n.add(self.build_arg_exp_list());
 
         n
     }
@@ -172,11 +198,11 @@ impl<'a> AstBuilder<'a> {
         // @todo introduce comma as token and use it as selector
         while true {
             match self.tlr.peek() {
-                t @ Token::VariableName(_) | t @ Token::StringValue(_) | t @ Token::NumericValue(_) => n.add(Node::leaf(t)),
+                Token::VariableName(_) => n.add(Node::leaf(self.tlr.next())),
+                Token::Comma => { self.tlr.next(); },
                 Token::ParenthesisClose => break,
                 t @ _ => panic!("Unexpected token for arg list {:?}", t),
             };
-            self.tlr.next();
         }
 
         // Close parenthesis.

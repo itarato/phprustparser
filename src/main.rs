@@ -99,6 +99,7 @@ fn main() {
 
     // Semicolon.
     add_one_char_token_reader!(tokenizer, ';', Token::Semicolon);
+    add_one_char_token_reader!(tokenizer, ',', Token::Comma);
 
     // Brackets.
     add_one_char_token_reader!(tokenizer, '(', Token::ParenthesisOpen);
@@ -135,15 +136,15 @@ fn main() {
 fn load_source() -> String {
     return "<?php
 
-function say($text) {
+function say($text, $bump) {
     echo('Hello World');
-    $foo = 1 + 2 - 3;
+    $foo = 1 + ((2 - 3) . ($text * 10));
 }
 
 function boo() {
     print('Something');
     $foo = 'never';
-    print($foo, $foo);
+    print($foo, $foo . '_boo');
 }
 
 $foo = 'Hello world';
